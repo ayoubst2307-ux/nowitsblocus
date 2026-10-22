@@ -1,0 +1,318 @@
+repeat task.wait() until game:IsLoaded()
+
+local Cloneref    = cloneref or function(i) return i end
+local Players     = Cloneref(game:GetService("Players"))
+local RunService  = Cloneref(game:GetService("RunService"))
+local UIS         = Cloneref(game:GetService("UserInputService"))
+local TweenService= Cloneref(game:GetService("TweenService"))
+local LocalPlayer = Players.LocalPlayer
+
+if game.PlaceId ~= 94881056723790 then
+    LocalPlayer:Kick("❌ Blocus Hub | Mauvais jeu")
+    return
+end
+
+-- ============================================================
+--  GUI
+-- ============================================================
+local gui = Instance.new("ScreenGui")
+gui.Name           = "BlocusHub"
+gui.ResetOnSpawn   = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent         = gethui and gethui() or LocalPlayer:WaitForChild("PlayerGui")
+
+local function mk(class, props, parent)
+    local i = Instance.new(class)
+    for k,v in pairs(props) do i[k] = v end
+    i.Parent = parent
+    return i
+end
+
+-- Fenêtre
+local Win = mk("Frame", {
+    Size             = UDim2.fromOffset(320, 420),
+    Position         = UDim2.fromScale(0.02, 0.1),
+    BackgroundColor3 = Color3.fromRGB(12,12,18),
+    BorderSizePixel  = 0,
+    Active           = true,
+    Draggable        = true,
+}, gui)
+mk("UICorner", { CornerRadius = UDim.new(0,10) }, Win)
+mk("UIStroke", { Color = Color3.fromRGB(220,30,30), Thickness = 1.5 }, Win)
+
+local Header = mk("Frame", {
+    Size             = UDim2.new(1,0,0,42),
+    BackgroundColor3 = Color3.fromRGB(30,10,10),
+    BorderSizePixel  = 0,
+}, Win)
+mk("UICorner", { CornerRadius = UDim.new(0,10) }, Header)
+mk("TextLabel", {
+    Size                   = UDim2.new(1,0,1,0),
+    BackgroundTransparency = 1,
+    Text                   = "🚨  Blocus Hub  🚨",
+    TextColor3             = Color3.fromRGB(255,80,80),
+    TextSize               = 16,
+    Font                   = Enum.Font.GothamBold,
+}, Header)
+
+local StatusLbl = mk("TextLabel", {
+    Size                   = UDim2.new(1,-20,0,16),
+    Position               = UDim2.fromOffset(10,46),
+    BackgroundTransparency = 1,
+    Text                   = "✅ Chargé — active tes features",
+    TextColor3             = Color3.fromRGB(60,255,120),
+    TextSize               = 11,
+    Font                   = Enum.Font.Gotham,
+    TextXAlignment         = Enum.TextXAlignment.Left,
+}, Win)
+
+local function setstatus(t, col)
+    StatusLbl.Text       = t
+    StatusLbl.TextColor3 = col or Color3.fromRGB(200,200,220)
+end
+
+local y_offset = 68
+local function mkbtn(label, on_col)
+    local active = false
+    local btn = mk("TextButton", {
+        Size             = UDim2.new(1,-20,0,32),
+        Position         = UDim2.fromOffset(10, y_offset),
+        BackgroundColor3 = Color3.fromRGB(25,15,15),
+        BorderSizePixel  = 0,
+        Text             = label .. "  [ OFF ]",
+        TextColor3       = Color3.fromRGB(200,200,220),
+        TextSize         = 12,
+        Font             = Enum.Font.GothamBold,
+    }, Win)
+    mk("UICorner", { CornerRadius = UDim.new(0,6) }, btn)
+    mk("UIStroke", { Color = Color3.fromRGB(80,20,20), Thickness = 1 }, btn)
+    y_offset += 36
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        btn.Text             = label .. (active and "  [ ON ]" or "  [ OFF ]")
+        btn.BackgroundColor3 = active and on_col or Color3.fromRGB(25,15,15)
+    end)
+    return function() return active end
+end
+
+local esp_on       = mkbtn("👁  ESP Joueurs",         Color3.fromRGB(50,50,180))
+local aimbot_on    = mkbtn("🎯  Silent Aimbot",        Color3.fromRGB(180,30,30))
+local speed_on     = mkbtn("⚡  Speed Hack (x3)",      Color3.fromRGB(140,80,0))
+local infjump_on   = mkbtn("🕊  Infinite Jump",        Color3.fromRGB(30,100,50))
+local noclip_on    = mkbtn("👻  Noclip",               Color3.fromRGB(80,0,120))
+local spin_on      = mkbtn("🌀  Spin Troll",           Color3.fromRGB(0,100,120))
+local float_on     = mkbtn("🎈  Float Troll",          Color3.fromRGB(0,80,80))
+local freeze_on    = mkbtn("🧊  Freeze Joueurs (troll)",Color3.fromRGB(0,60,140))
+local bighead_on   = mkbtn("🗿  Big Head",             Color3.fromRGB(100,60,0))
+
+-- Resize fenêtre
+Win.Size = UDim2.fromOffset(320, y_offset + 10)
+
+-- ============================================================
+--  ESP
+-- ============================================================
+local esp_cache: { [Player]: { box:any, name:any, hp:any, dist:any } } = {}
+local Camera = workspace.CurrentCamera
+
+local function esp_add(p: Player)
+    if esp_cache[p] then return end
+    local function sq(f, c) local d=Drawing.new("Square"); d.Thickness=1.5; d.Filled=f; d.Color=c; d.Visible=false; return d end
+    local function tx(s, c) local d=Drawing.new("Text"); d.Size=s; d.Center=true; d.Outline=true; d.Color=c; d.Visible=false; return d end
+    esp_cache[p] = {
+        box  = sq(false, Color3.fromRGB(255,60,60)),
+        name = tx(12,    Color3.fromRGB(255,255,255)),
+        hp   = sq(true,  Color3.fromRGB(60,255,60)),
+        dist = tx(10,    Color3.fromRGB(255,200,50)),
+    }
+end
+
+local function esp_hide(p: Player)
+    if not esp_cache[p] then return end
+    for _,d in pairs(esp_cache[p]) do d.Visible = false end
+end
+
+local function esp_remove(p: Player)
+    if not esp_cache[p] then return end
+    for _,d in pairs(esp_cache[p]) do d:Remove() end
+    esp_cache[p] = nil
+end
+
+Players.PlayerRemoving:Connect(esp_remove)
+
+RunService.RenderStepped:Connect(function()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local char = p.Character
+        if not char then esp_hide(p); continue end
+        local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local hum  = char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum then esp_hide(p); continue end
+        if not esp_on() then esp_hide(p); continue end
+
+        esp_add(p)
+        local ds = esp_cache[p]
+        local sp, vis = Camera:WorldToViewportPoint(root.Position)
+        if not vis then esp_hide(p); continue end
+
+        local dist  = (root.Position - Camera.CFrame.Position).Magnitude
+        local scale = 1600 / dist
+        local bw, bh = scale * 1.0, scale * 1.8
+
+        ds.box.Size     = Vector2.new(bw, bh)
+        ds.box.Position = Vector2.new(sp.X - bw/2, sp.Y - bh/2)
+        ds.box.Visible  = true
+
+        ds.name.Text     = p.DisplayName
+        ds.name.Position = Vector2.new(sp.X, sp.Y - bh/2 - 14)
+        ds.name.Visible  = true
+
+        ds.dist.Text     = math.floor(dist) .. "m"
+        ds.dist.Position = Vector2.new(sp.X, sp.Y + bh/2 + 2)
+        ds.dist.Visible  = true
+
+        local ratio = math.clamp(hum.Health / math.max(hum.MaxHealth,1), 0, 1)
+        ds.hp.Color    = Color3.fromRGB(math.floor((1-ratio)*255), math.floor(ratio*220), 50)
+        ds.hp.Size     = Vector2.new(3, bh * ratio)
+        ds.hp.Position = Vector2.new(sp.X - bw/2 - 7, sp.Y - bh/2 + bh*(1-ratio))
+        ds.hp.Visible  = true
+    end
+end)
+
+-- ============================================================
+--  SILENT AIMBOT — téléporte la caméra sur la tête du plus proche
+-- ============================================================
+local function get_closest(): (BasePart?, number)
+    local closest_part: BasePart? = nil
+    local closest_dist = math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local char = p.Character
+        if not char then continue end
+        local head = char:FindFirstChild("Head") :: BasePart?
+        local hum  = char:FindFirstChildOfClass("Humanoid")
+        if not head or not hum or hum.Health <= 0 then continue end
+        local dist = (head.Position - Camera.CFrame.Position).Magnitude
+        if dist < closest_dist then
+            closest_dist = dist
+            closest_part = head
+        end
+    end
+    return closest_part, closest_dist
+end
+
+RunService.RenderStepped:Connect(function()
+    if not aimbot_on() then return end
+    local head, _ = get_closest()
+    if not head then return end
+    -- silent : on oriente juste la caméra vers la cible sans bouger le perso
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not root then return end
+    -- lock le regard vers la tête
+    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, head.Position)
+end)
+
+-- ============================================================
+--  SPEED HACK
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    hum.WalkSpeed = speed_on() and 48 or 16
+end)
+
+-- ============================================================
+--  INFINITE JUMP
+-- ============================================================
+UIS.JumpRequest:Connect(function()
+    if not infjump_on() then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+end)
+
+-- ============================================================
+--  NOCLIP
+-- ============================================================
+RunService.Stepped:Connect(function()
+    if not noclip_on() then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then
+            p.CanCollide = false
+        end
+    end
+end)
+
+-- ============================================================
+--  SPIN TROLL — fait tourner le perso sur lui-même
+-- ============================================================
+local spin_angle = 0
+RunService.Heartbeat:Connect(function(dt)
+    if not spin_on() then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not root then return end
+    spin_angle = (spin_angle + dt * 720) % 360
+    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, math.rad(spin_angle), 0)
+end)
+
+-- ============================================================
+--  FLOAT TROLL — lévite doucement
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    if not float_on() then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not root then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then hum:ChangeState(Enum.HumanoidStateType.Physics) end
+    root.AssemblyLinearVelocity = Vector3.new(
+        root.AssemblyLinearVelocity.X,
+        2,
+        root.AssemblyLinearVelocity.Z
+    )
+end)
+
+-- ============================================================
+--  FREEZE JOUEURS TROLL — téléporte tous les joueurs sur place
+--  (client-sided : les freezes sont visibles que pour toi)
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    if not freeze_on() then return end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        local char = p.Character
+        if not char then continue end
+        local root = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+end)
+
+-- ============================================================
+--  BIG HEAD — scale la tête x3
+-- ============================================================
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head") :: BasePart?
+    if not head then return end
+    if bighead_on() then
+        head.Size = Vector3.new(3, 3, 3)
+    else
+        head.Size = Vector3.new(2, 1, 1)
+    end
+end)
+
+setstatus("✅ Blocus Hub chargé !", Color3.fromRGB(60,255,120))
+print("[BlocusHub] loaded | PlaceId " .. game.PlaceId)
